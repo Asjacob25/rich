@@ -1,0 +1,42 @@
+============================= test session starts ==============================
+platform linux -- Python 3.8.18, pytest-8.3.3, pluggy-1.5.0
+rootdir: /home/runner/work/rich/rich
+configfile: pyproject.toml
+plugins: cov-5.0.0
+collected 0 items
+WARNING: Failed to generate report: No data to report.
+
+
+
+---------- coverage: platform linux, python 3.8.18-final-0 -----------
+
+============================ no tests ran in 0.06s =============================
+============================= test session starts ==============================
+platform linux -- Python 3.8.18, pytest-8.3.3, pluggy-1.5.0
+rootdir: /home/runner/work/rich/rich
+configfile: pyproject.toml
+plugins: cov-5.0.0
+collected 14 items
+
+generated_tests/python/test_color.py .......F......                      [100%]
+
+=================================== FAILURES ===================================
+_______________ TestColor.test_get_truecolor_with_default_theme ________________
+Fixture "default_terminal_theme" called directly. Fixtures are not meant to be called directly,
+but are created automatically when test functions request them as parameters.
+See https://docs.pytest.org/en/stable/explanation/fixtures.html for more information about fixtures, and
+https://docs.pytest.org/en/stable/deprecations.html#calling-fixtures-directly about how to update your code.
+
+---------- coverage: platform linux, python 3.8.18-final-0 -----------
+Name            Stmts   Miss  Cover   Missing
+---------------------------------------------
+rich/color.py     186     81    56%   30, 33, 46, 317-320, 327-330, 336, 342, 347, 362-378, 439, 460-482, 489, 492-495, 498-501, 504-505, 517, 524-531, 544-568
+---------------------------------------------
+TOTAL             186     81    56%
+
+=========================== short test summary info ============================
+FAILED generated_tests/python/test_color.py::TestColor::test_get_truecolor_with_default_theme - Failed: Fixture "default_terminal_theme" called directly. Fixtures are not meant to be called directly,
+but are created automatically when test functions request them as parameters.
+See https://docs.pytest.org/en/stable/explanation/fixtures.html for more information about fixtures, and
+https://docs.pytest.org/en/stable/deprecations.html#calling-fixtures-directly about how to update your code.
+========================= 1 failed, 13 passed in 0.17s =========================
