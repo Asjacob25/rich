@@ -120,7 +120,9 @@ class TestGenerator:
     except Exception as e:
         logging.error(f"Error identifying related files in {file_name}: {e}")
 
-    return related_files
+    return []
+
+    #return related_files
 
  def get_related_test_files(self, language: str, file_name: str) -> List[str]:
       related_test_files = []#Identify related files based on import statements or includes.
