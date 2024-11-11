@@ -62,67 +62,59 @@ class TestGenerator:
      return frameworks.get(language, 'unknown')
  
  def get_related_files(self, language: str, file_name: str) -> List[str]:
-    """Identify related files based on import statements or includes."""
-    related_files = []
-    file_directory = Path(file_name).parent  # Get the directory of the current file for relative paths
+     """Identify related files based on import statements or includes."""
+     related_files = []
+     
+     try:
+          if (language=="Python" or language =='JavaScript' or language =='TypeScript'):
+              with open(file_name, 'r') as f:
+                  for line in f:
+                      # Example: Detecting imports in Python and JavaScript/TypeScript
+                      if 'import ' in line or 'from ' in line or 'require(' in line:
+                          parts = line.split()
+                          ##need to add in the . now
+                          for part in parts:
+                              # Check for file extensions
+                              # Check for file extensions
+                              if len(part) > 1 and part[0]=="." and part[1] != ".":
+                                  path = part.replace(".","")
+                                  for ext in ('.py', '.js', '.ts'):
+                                      potential_file = f"{path}{ext}"
+                                      #print(potential_file + "<-- from . \n")
+                                      if Path(potential_file).exists():
+                                          related_files.append(potential_file)
+                                          break  #
+                              elif '.' in part:
+                                  path = part.replace(".","/")
+                                  for ext in ('.py', '.js', '.ts'):
+                                      potential_file = f"{path}{ext}"
+                                      if Path(potential_file).exists():
+                                          related_files.append(potential_file)
+                                          break  # 
+                              else:
+                                  if part.endswith(('.py', '.js', '.ts')) and Path(part).exists():
+                                      related_files.append(part)
+                                      
+                                      # Check for class/module names without extensions
+                                  elif part.isidentifier():  # Checks if part is a valid identifier
+                                      # Construct potential file names
+                                      base_name = part.lower()  # Assuming file names are in lowercase
+                                      for ext in ('.py', '.js', '.ts'):
+                                          potential_file = f"{base_name}{ext}"
+                                          if Path(potential_file).exists():
+                                              related_files.append(potential_file)
+                                              break  # Found a related file, no need to check further extensions
+                              
+          elif (language =='C++'):
+              return [] #need to code this 
+          elif (language =='C#'):
+              return [] #need to code this 
 
-    try:
-        if language in {"Python", "JavaScript", "TypeScript"}:
-            with open(file_name, 'r') as f:
-                for line in f:
-                    if 'import ' in line or 'from ' in line or 'require(' in line:
-                        parts = line.split()
-                        
-                        # Detects relative imports like `from .file_name import ...`
-                        if 'from' in parts:
-                            index = parts.index('from')
-                            module_path = parts[index + 1]
-                            if module_path.startswith("."):  # Handles relative import
-                                relative_path = module_path.replace(".", "").replace("_", "").replace(".", "/")
-                                for ext in ('.py', '.js', '.ts'):
-                                    potential_file = file_directory / f"{relative_path}{ext}"
-                                    if potential_file.exists():
-                                        related_files.append(str(potential_file))
-                                        break
-                        
-                        for part in parts:
-                            # Check for relative imports with single dot, without `from`
-                            if len(part) > 1 and part[0] == "." and part[1] != ".":
-                                path = part.replace(".", "").replace("_", "").replace(".", "/")
-                                for ext in ('.py', '.js', '.ts'):
-                                    potential_file = file_directory / f"{path}{ext}"
-                                    if potential_file.exists():
-                                        related_files.append(str(potential_file))
-                                        break
-                            elif '.' in part:
-                                path = part.replace(".", "/")
-                                for ext in ('.py', '.js', '.ts'):
-                                    potential_file = f"{path}{ext}"
-                                    if Path(potential_file).exists():
-                                        related_files.append(str(potential_file))
-                                        break
-                            else:
-                                if part.endswith(('.py', '.js', '.ts')) and Path(part).exists():
-                                    related_files.append(part)
-                                elif part.isidentifier():  # Valid class/module names
-                                    base_name = part.lower()
-                                    for ext in ('.py', '.js', '.ts'):
-                                        potential_file = f"{base_name}{ext}"
-                                        if Path(potential_file).exists():
-                                            related_files.append(potential_file)
-                                            break
-                        
-        elif language == 'C++':
-            return []  # Placeholder for C++ support
-        elif language == 'C#':
-            return []  # Placeholder for C# support
-
-    except Exception as e:
-        logging.error(f"Error identifying related files in {file_name}: {e}")
-
-    return []
-
-    #return related_files
+     except Exception as e:
+          logging.error(f"Error identifying related files in {file_name}: {e}")
+     #print("related FILES HERE "+ ', '.join(related_files) + "\n")
+     #limited_files = related_files[:1]# List
+     return related_files  # List
 
  def get_related_test_files(self, language: str, file_name: str) -> List[str]:
       related_test_files = []#Identify related files based on import statements or includes.
