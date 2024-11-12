@@ -7,6 +7,7 @@ import json
 from pathlib import Path
 from requests.exceptions import RequestException
 from typing import List, Optional, Dict, Any
+import re
 
 # Set up logging
 logging.basicConfig(
@@ -17,7 +18,7 @@ logging.basicConfig(
 class TestGenerator:
  def __init__(self):
      self.api_key = os.getenv('OPENAI_API_KEY')
-     self.model = os.getenv('OPENAI_MODEL', 'gpt-4-turbo-preview')
+     self.model = os.getenv('OPENAI_MODEL', 'o1-preview')
      
      try:
          self.max_tokens = int(os.getenv('OPENAI_MAX_TOKENS', '2000'))
@@ -62,59 +63,65 @@ class TestGenerator:
      return frameworks.get(language, 'unknown')
  
  def get_related_files(self, language: str, file_name: str) -> List[str]:
-     """Identify related files based on import statements or includes."""
-     related_files = []
-     
-     try:
-          if (language=="Python" or language =='JavaScript' or language =='TypeScript'):
-              with open(file_name, 'r') as f:
-                  for line in f:
-                      # Example: Detecting imports in Python and JavaScript/TypeScript
-                      if 'import ' in line or 'from ' in line or 'require(' in line:
-                          parts = line.split()
-                          ##need to add in the . now
-                          for part in parts:
-                              # Check for file extensions
-                              # Check for file extensions
-                              if len(part) > 1 and part[0]=="." and part[1] != ".":
-                                  path = part.replace(".","")
-                                  for ext in ('.py', '.js', '.ts'):
-                                      potential_file = f"{path}{ext}"
-                                      #print(potential_file + "<-- from . \n")
-                                      if Path(potential_file).exists():
-                                          related_files.append(potential_file)
-                                          break  #
-                              elif '.' in part:
-                                  path = part.replace(".","/")
-                                  for ext in ('.py', '.js', '.ts'):
-                                      potential_file = f"{path}{ext}"
-                                      if Path(potential_file).exists():
-                                          related_files.append(potential_file)
-                                          break  # 
-                              else:
-                                  if part.endswith(('.py', '.js', '.ts')) and Path(part).exists():
-                                      related_files.append(part)
-                                      
-                                      # Check for class/module names without extensions
-                                  elif part.isidentifier():  # Checks if part is a valid identifier
-                                      # Construct potential file names
-                                      base_name = part.lower()  # Assuming file names are in lowercase
-                                      for ext in ('.py', '.js', '.ts'):
-                                          potential_file = f"{base_name}{ext}"
-                                          if Path(potential_file).exists():
-                                              related_files.append(potential_file)
-                                              break  # Found a related file, no need to check further extensions
-                              
-          elif (language =='C++'):
-              return [] #need to code this 
-          elif (language =='C#'):
-              return [] #need to code this 
+    """Identify related files based on import statements or includes."""
+    related_files = []
+    file_directory = Path(file_name).parent  # Get the directory of the current file for relative paths
 
-     except Exception as e:
-          logging.error(f"Error identifying related files in {file_name}: {e}")
-     #print("related FILES HERE "+ ', '.join(related_files) + "\n")
-     #limited_files = related_files[:1]# List
-     return related_files  # List
+    try:
+        if language in {"Python", "JavaScript", "TypeScript"}:
+            with open(file_name, 'r') as f:
+                for line in f:
+                    if 'import ' in line or 'from ' in line or 'require(' in line:
+                        parts = line.split()
+                        
+                        # Detects relative imports like `from .file_name import ...`
+                        if 'from' in parts:
+                            index = parts.index('from')
+                            module_path = parts[index + 1]
+                            if module_path.startswith("."):  # Handles relative import
+                                relative_path = module_path.replace(".", "").replace("_", "").replace(".", "/")
+                                for ext in ('.py', '.js', '.ts'):
+                                    potential_file = file_directory / f"{relative_path}{ext}"
+                                    if potential_file.exists():
+                                        related_files.append(str(potential_file))
+                                        break
+                        
+                        for part in parts:
+                            # Check for relative imports with single dot, without `from`
+                            if len(part) > 1 and part[0] == "." and part[1] != ".":
+                                path = part.replace(".", "").replace("_", "").replace(".", "/")
+                                for ext in ('.py', '.js', '.ts'):
+                                    potential_file = file_directory / f"{path}{ext}"
+                                    if potential_file.exists():
+                                        related_files.append(str(potential_file))
+                                        break
+                            elif '.' in part:
+                                path = part.replace(".", "/")
+                                for ext in ('.py', '.js', '.ts'):
+                                    potential_file = f"{path}{ext}"
+                                    if Path(potential_file).exists():
+                                        related_files.append(str(potential_file))
+                                        break
+                            else:
+                                if part.endswith(('.py', '.js', '.ts')) and Path(part).exists():
+                                    related_files.append(part)
+                                elif part.isidentifier():  # Valid class/module names
+                                    base_name = part.lower()
+                                    for ext in ('.py', '.js', '.ts'):
+                                        potential_file = f"{base_name}{ext}"
+                                        if Path(potential_file).exists():
+                                            related_files.append(potential_file)
+                                            break
+                        
+        elif language == 'C++':
+            return []  # Placeholder for C++ support
+        elif language == 'C#':
+            return []  # Placeholder for C# support
+
+    except Exception as e:
+        logging.error(f"Error identifying related files in {file_name}: {e}")
+
+    return related_files
 
  def get_related_test_files(self, language: str, file_name: str) -> List[str]:
       related_test_files = []#Identify related files based on import statements or includes.
@@ -176,13 +183,66 @@ class TestGenerator:
       limited_test_files = related_test_files[:1]# List
       return limited_test_files  # List
  
- def generate_coverage_beforehand(self, test_file:Path, file_name:str, language: str):
+ def all_test_files_before(self, language: str, file_name: str) -> str:
+     #run coverage run
+     #know if there is an ini file probably won't work
+     #if it generates an error don't pass it in
+     #.....
+     #if the file is 100% coverage probably don't want test cases for it
+    coverageRunResult = ""
+    file_name_path= Path(file_name)
+    report_file = f"{file_name_path.stem}_coverage_report.txt" #make a file temporarily
+    try:
+        if (language=='Python'):
+            #python
+            subprocess.run(["coverage","run","-m","pytest"])
+            #subprocess.run(["coverage","report", "-m"],stdout=coverageRunResult,check=True)
+            subprocess.run(["coverage","report", "-m"],stdout=open(report_file, "a"),check=True)
+            with open(report_file, "r") as file:
+                coverageRunResult = file.read()
+            os.remove(report_file) # deleting it now
 
-       try:
-           self.generate_coverage_report(file_name,test_file,language) #generating the coverage report
-       except subprocess.CalledProcessError as e:
-           logging.error(f"Error generating the before coverage report for {test_file}: {e}")
-       logging.info("made the before test case generation  :" + str(test_file))
+
+
+            # Find the line that starts with "calculator.py"
+            match = re.search(r"^"+file_name_path.stem+"\.py\s+.*", coverageRunResult, re.MULTILINE)
+
+            # Extract the matched line
+            if match:
+                calculator_line = match.group(0)
+                coverageRunResult = calculator_line
+                match = re.search(r"%\s+(.*)", calculator_line)
+                coverageRunResult = match.group(0)
+                print(calculator_line)
+
+            else:
+                print("Line for 'calculator.py' not found.")
+
+                
+        
+    except subprocess.CalledProcessError as e:
+        logging.error(f"Error generating the all test files coverage report for {file_name}: {e}")
+    if (coverageRunResult==""):
+        coverageRunResult = "The coverageReportDidNotHappen"
+    elif ("Error" in coverageRunResult or "error" in coverageRunResult):
+        coverageRunResult = "There was an error somewhere in the result"
+    return coverageRunResult
+    
+
+ def generate_coverage_beforehand(self, test_file:Path, file_name:str, language: str):
+       if (language=="Python"):
+            try:
+                report_file = test_file.parent / f"{test_file.stem}_coverage_report.txt"
+                subprocess.run(["coverage","erase"])
+                subprocess.run(["coverage","run","-m","pytest"])
+                subprocess.run(["coverage","report", "-m"],stdout=open(report_file, "a"),check=True)
+                #self.generate_coverage_report(file_name,test_file,language) #generating the coverage report
+
+            except subprocess.CalledProcessError as e:
+                logging.error(f"Error generating the before coverage report for {test_file}: {e}")
+            logging.info("made the before test case generation  :" + str(test_file))
+            
+        
        
        
  
@@ -233,8 +293,10 @@ class TestGenerator:
        try:
            if language.lower() == 'python':
                # Check if 'coverage' is installed for Python
-               
+               subprocess.check_call([sys.executable, '-m','pip','install', 'coverage'])
+               subprocess.check_call([sys.executable, '-m','pip','install', 'coverage','pytest'])#pip install coverage pytest
                subprocess.check_call([sys.executable, '-m','pip','install', 'pytest-cov'])
+               subprocess.check_call([sys.executable, '-m','coverage','erase'])#coverage erase
                logging.info(f"Coverage tool for Python is already installed.")
            elif language.lower() == 'javascript':
                # Check if 'jest' coverage is available for JavaScript
@@ -323,6 +385,15 @@ class TestGenerator:
           except Exception as e:
               logging.error(f"Error reading related test file {related_test_file}: {e}")
 
+      
+      try:
+        allCoverageReport = self.all_test_files_before(language,file_name)
+      except Exception as e:
+          logging.error(f"Error with doing the allCoverageReport:{e}")
+          allCoverageReport = "Was not able to get the coverage of the file beforehand"
+     
+      logging.info("Processing all test files before :) ")
+
       # Add the file name at the top of the prompt
       framework = self.get_test_framework(language)
       prompt = f"""Generate comprehensive unit tests for the following {language} file: {file_name} using {framework}.
@@ -346,6 +417,9 @@ class TestGenerator:
 
       Related test cases:
       {related_test_content}
+
+      Here are the uncovered lines in the file to make test cases for:
+      {allCoverageReport.strip()}
 
       Generate only the test code without any explanations or notes."""
 
@@ -471,7 +545,8 @@ class TestGenerator:
               if prompt:
                   
                   test_cases = self.call_openai_api(prompt)
-                  
+                  logging.info(prompt+ "\n\n\n")
+                  logging.info("this is test_cases result"+ test_cases)
                   if test_cases:
                       test_cases = test_cases.replace("“", '"').replace("”", '"')
 
